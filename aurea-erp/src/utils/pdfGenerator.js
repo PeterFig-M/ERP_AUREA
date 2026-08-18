@@ -312,6 +312,12 @@ export async function descargarPdfCotizacion(cotizacion, empresa, nombreArchivo)
   documento.save(`${nombreArchivo}.pdf`)
 }
 
+function normalizarEstadoSuperficiePdf(valor) {
+  if (valor === true) return 'caries'
+  if (!valor || !COLOR_SUPERFICIE_PDF[valor]) return null
+  return valor
+}
+
 function dibujarFilaOdontogramaPdf(documento, margen, inicioY, anchoDisponible, dientesLista, estadosDientes) {
   const pasoX = anchoDisponible / dientesLista.length
   const ladoCaja = 3.2
@@ -344,8 +350,8 @@ function dibujarFilaOdontogramaPdf(documento, margen, inicioY, anchoDisponible, 
 
     Object.entries(posiciones).forEach(([clave, coordenadas]) => {
       const [x, y] = coordenadas
-      const estado = superficies[clave] || 'ninguno'
-      const color = COLOR_SUPERFICIE_PDF[estado]
+      const estado = normalizarEstadoSuperficiePdf(superficies[clave])
+      const color = estado ? COLOR_SUPERFICIE_PDF[estado] : null
 
       if (color) {
         documento.setFillColor(...color)

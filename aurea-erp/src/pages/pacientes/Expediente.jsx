@@ -25,6 +25,12 @@ const CLASE_SUPERFICIE = {
   extraccion: 'bg-orange-500 border-orange-700'
 }
 
+function normalizarEstadoSuperficie(valor) {
+  if (valor === true) return 'caries'
+  if (!valor || !ESTADOS_SUPERFICIE.includes(valor)) return 'ninguno'
+  return valor
+}
+
 const ANTECEDENTES_IZQUIERDA = [
   { clave: 'epilepsia', etiqueta: 'Epilepsia o Convulsiones' },
   { clave: 'diabetes', etiqueta: 'Diabetes Mellitus' },
@@ -74,11 +80,12 @@ function calcularEdad(fechaNacimiento) {
 }
 
 function SuperficieBox({ estado, alClic }) {
+  const estadoNormalizado = normalizarEstadoSuperficie(estado)
   return (
     <button
       type="button"
       onClick={alClic}
-      className={`h-3 w-3 border transition ${CLASE_SUPERFICIE[estado || 'ninguno']}`}
+      className={`h-3 w-3 border transition ${CLASE_SUPERFICIE[estadoNormalizado]}`}
     />
   )
 }
@@ -245,7 +252,7 @@ export default function Expediente() {
   function alternarSuperficie(numero, superficie) {
     setEstadosDientes((previos) => {
       const datosActuales = previos[numero] || { superficies: {}, presente: true }
-      const estadoActual = datosActuales.superficies?.[superficie] || 'ninguno'
+      const estadoActual = normalizarEstadoSuperficie(datosActuales.superficies?.[superficie])
       const indice = ESTADOS_SUPERFICIE.indexOf(estadoActual)
       const siguiente = ESTADOS_SUPERFICIE[(indice + 1) % ESTADOS_SUPERFICIE.length]
 

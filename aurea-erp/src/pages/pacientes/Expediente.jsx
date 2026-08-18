@@ -15,6 +15,16 @@ import { descargarPdfExpediente } from '../../utils/pdfGenerator'
 const DIENTES_SUPERIORES = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28]
 const DIENTES_INFERIORES = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
 
+const ESTADOS_SUPERFICIE = ['ninguno', 'caries', 'resina', 'amalgama', 'extraccion']
+
+const CLASE_SUPERFICIE = {
+  ninguno: 'bg-white border-aurea-goldDark/50',
+  caries: 'bg-red-500 border-red-700',
+  resina: 'bg-blue-500 border-blue-700',
+  amalgama: 'bg-gray-400 border-gray-600',
+  extraccion: 'bg-orange-500 border-orange-700'
+}
+
 const ANTECEDENTES_IZQUIERDA = [
   { clave: 'epilepsia', etiqueta: 'Epilepsia o Convulsiones' },
   { clave: 'diabetes', etiqueta: 'Diabetes Mellitus' },
@@ -41,6 +51,12 @@ const ANTECEDENTES_VACIO = {
   otros: ''
 }
 
+const OPCIONES_PROTESIS = [
+  { valor: 'ninguna', etiqueta: 'Ninguna' },
+  { valor: 'removible', etiqueta: 'Removible' },
+  { valor: 'fija', etiqueta: 'Fija' }
+]
+
 function fechaHoyInput() {
   const hoy = new Date()
   return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`
@@ -57,14 +73,12 @@ function calcularEdad(fechaNacimiento) {
   return String(edad)
 }
 
-function SuperficieBox({ activo, alClic }) {
+function SuperficieBox({ estado, alClic }) {
   return (
     <button
       type="button"
       onClick={alClic}
-      className={`h-3 w-3 border transition ${
-        activo ? 'border-red-600 bg-red-500' : 'border-aurea-goldDark/60 bg-white'
-      }`}
+      className={`h-3 w-3 border transition ${CLASE_SUPERFICIE[estado || 'ninguno']}`}
     />
   )
 }
@@ -78,13 +92,13 @@ function DienteSuperficies({ numero, datos, alClicSuperficie, alClicPresente }) 
       <span className="text-[10px] font-medium text-aurea-text">{numero}</span>
       <div className="grid grid-cols-3 grid-rows-3 gap-0.5">
         <div />
-        <SuperficieBox activo={superficies.arriba} alClic={() => alClicSuperficie('arriba')} />
+        <SuperficieBox estado={superficies.arriba} alClic={() => alClicSuperficie('arriba')} />
         <div />
-        <SuperficieBox activo={superficies.izquierda} alClic={() => alClicSuperficie('izquierda')} />
-        <SuperficieBox activo={superficies.centro} alClic={() => alClicSuperficie('centro')} />
-        <SuperficieBox activo={superficies.derecha} alClic={() => alClicSuperficie('derecha')} />
+        <SuperficieBox estado={superficies.izquierda} alClic={() => alClicSuperficie('izquierda')} />
+        <SuperficieBox estado={superficies.centro} alClic={() => alClicSuperficie('centro')} />
+        <SuperficieBox estado={superficies.derecha} alClic={() => alClicSuperficie('derecha')} />
         <div />
-        <SuperficieBox activo={superficies.abajo} alClic={() => alClicSuperficie('abajo')} />
+        <SuperficieBox estado={superficies.abajo} alClic={() => alClicSuperficie('abajo')} />
         <div />
       </div>
       <button
@@ -116,6 +130,7 @@ export default function Expediente() {
   const [consentimientoDocumento, setConsentimientoDocumento] = useState('')
 
   const [estadosDientes, setEstadosDientes] = useState({})
+  const [protesis, setProtesis] = useState('ninguna')
 
   const [diagnostico, setDiagnostico] = useState('')
   const [notas, setNotas] = useState([])
@@ -158,6 +173,7 @@ export default function Expediente() {
         setEdad(expedienteExistente.datosGenerales?.edad || calcularEdad(datosPaciente?.fechaNacimiento))
         setAntecedentes(expedienteExistente.antecedentes || ANTECEDENTES_VACIO)
         setEstadosDientes(expedienteExistente.odontograma?.estados || {})
+        setProtesis(expedienteExistente.protesis || 'ninguna')
         setDiagnostico(expedienteExistente.diagnostico || '')
         setNotas(expedienteExistente.notas || [])
         setConsentimientoNombre(expedienteExistente.consentimiento?.nombre || datosPaciente?.nombre || '')
@@ -229,13 +245,17 @@ export default function Expediente() {
   function alternarSuperficie(numero, superficie) {
     setEstadosDientes((previos) => {
       const datosActuales = previos[numero] || { superficies: {}, presente: true }
+      const estadoActual = datosActuales.superficies?.[superficie] || 'ninguno'
+      const indice = ESTADOS_SUPERFICIE.indexOf(estadoActual)
+      const siguiente = ESTADOS_SUPERFICIE[(indice + 1) % ESTADOS_SUPERFICIE.length]
+
       return {
         ...previos,
         [numero]: {
           ...datosActuales,
           superficies: {
             ...datosActuales.superficies,
-            [superficie]: !datosActuales.superficies?.[superficie]
+            [superficie]: siguiente
           }
         }
       }
@@ -301,6 +321,7 @@ export default function Expediente() {
         antecedentes,
         consentimiento: { nombre: consentimientoNombre, documento: consentimientoDocumento },
         odontograma: { estados: estadosDientes },
+        protesis,
         diagnostico,
         notas,
         odontologoNombre,
@@ -329,6 +350,7 @@ export default function Expediente() {
         antecedentes,
         consentimiento: { nombre: consentimientoNombre, documento: consentimientoDocumento },
         estadosDientes,
+        protesis,
         diagnostico,
         notas,
         odontologoNombre,
@@ -515,9 +537,34 @@ export default function Expediente() {
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-aurea-text/60">
-          Toca cada superficie del diente para marcarla. Toca la letra "P" para alternar entre Presente y Ausente.
+        <div className="mt-3 flex flex-wrap gap-4 text-xs text-aurea-text">
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-red-700 bg-red-500" /> Caries</span>
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-blue-700 bg-blue-500" /> Obturación de resina</span>
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-gray-600 bg-gray-400" /> Obturación de amalgama</span>
+          <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-orange-700 bg-orange-500" /> Extracción indicada</span>
+        </div>
+
+        <p className="mt-2 text-xs text-aurea-text/60">
+          Toca cada superficie del diente para ciclar entre los estados. Toca la letra "P" para alternar entre Presente y Ausente.
         </p>
+
+        <div className="mt-5">
+          <p className="mb-2 text-sm font-medium text-aurea-text">Prótesis</p>
+          <div className="flex overflow-hidden rounded-md border border-aurea-border text-sm">
+            {OPCIONES_PROTESIS.map((opcion) => (
+              <button
+                key={opcion.valor}
+                type="button"
+                onClick={() => setProtesis(opcion.valor)}
+                className={`flex-1 px-4 py-2 font-medium transition ${
+                  protesis === opcion.valor ? 'bg-aurea-gold text-white' : 'bg-white text-aurea-text hover:bg-aurea-cream'
+                }`}
+              >
+                {opcion.etiqueta}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-lg border border-aurea-border bg-white p-4 shadow-sm sm:p-6">

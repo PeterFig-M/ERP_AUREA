@@ -124,6 +124,9 @@ export default function Factura() {
     setMensaje('')
 
     try {
+      const empresaActualizada = await obtenerConfiguracionEmpresa()
+      setEmpresa(empresaActualizada || {})
+
       let numero = ''
 
       if (tipoDocumento === 'factura') {
@@ -181,7 +184,7 @@ export default function Factura() {
   const facturaPreview = {
     tipoDocumento,
     formaPago,
-    numero: 'PENDIENTE',
+    numero: ultimaFacturaGuardada ? ultimaFacturaGuardada.numero : 'PENDIENTE',
     pacienteNombre: pacienteSeleccionado?.nombre || '',
     pacienteRtn: pacienteSeleccionado?.rtn || '',
     doctor,

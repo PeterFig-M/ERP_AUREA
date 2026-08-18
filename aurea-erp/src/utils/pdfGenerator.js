@@ -6,6 +6,16 @@ const COLOR_DORADO = [176, 141, 87]
 const COLOR_DORADO_OSCURO = [140, 109, 63]
 const COLOR_TEXTO = [46, 42, 38]
 
+const DIENTES_SUPERIORES_PDF = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28]
+const DIENTES_INFERIORES_PDF = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
+
+const COLOR_SUPERFICIE_PDF = {
+  caries: [220, 38, 38],
+  resina: [37, 99, 235],
+  amalgama: [156, 163, 175],
+  extraccion: [234, 88, 12]
+}
+
 let logoCacheado = null
 
 async function obtenerLogoBase64() {
@@ -33,7 +43,7 @@ function dibujarLogo(documento, logoBase64, margen, tamano = 46, posicionY = 12)
   try {
     documento.addImage(logoBase64, 'PNG', margen, posicionY, tamano, tamano)
   } catch (error) {
-    // Si el logo no puede dibujarse, el documento continúa sin él
+    return
   }
 }
 
@@ -302,28 +312,93 @@ export async function descargarPdfCotizacion(cotizacion, empresa, nombreArchivo)
   documento.save(`${nombreArchivo}.pdf`)
 }
 
-const DIENTES_SUPERIORES_PDF = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28]
-const DIENTES_INFERIORES_PDF = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
+function dibujarFilaOdontogramaPdf(documento, margen, inicioY, anchoDisponible, dientesLista, estadosDientes) {
+  const pasoX = anchoDisponible / dientesLista.length
+  const ladoCaja = 3.2
 
-function abreviarDiente(datos) {
-  if (!datos) return null
-  if (datos.presente === false) return 'A'
+  dientesLista.forEach((numero, indice) => {
+    const centroX = margen + pasoX * indice + pasoX / 2
+    const datos = estadosDientes?.[numero]
+    const presente = datos?.presente !== false
 
-  const superficies = datos.superficies || {}
-  const marcadas = []
-  if (superficies.arriba) marcadas.push('a')
-  if (superficies.abajo) marcadas.push('b')
-  if (superficies.izquierda) marcadas.push('i')
-  if (superficies.derecha) marcadas.push('d')
-  if (superficies.centro) marcadas.push('c')
+    documento.setFont('helvetica', 'normal')
+    documento.setFontSize(6)
+    documento.setTextColor(...COLOR_TEXTO)
+    documento.text(String(numero), centroX, inicioY, { align: 'center' })
 
-  return marcadas.length > 0 ? marcadas.join('') : null
+    if (!presente) {
+      documento.setFontSize(5)
+      documento.setTextColor(180, 40, 40)
+      documento.text('Ausente', centroX, inicioY + 9, { align: 'center' })
+      return
+    }
+
+    const superficies = datos?.superficies || {}
+    const posiciones = {
+      arriba: [centroX - ladoCaja / 2, inicioY + 3],
+      izquierda: [centroX - ladoCaja * 1.6, inicioY + 3 + ladoCaja],
+      centro: [centroX - ladoCaja / 2, inicioY + 3 + ladoCaja],
+      derecha: [centroX + ladoCaja * 0.6, inicioY + 3 + ladoCaja],
+      abajo: [centroX - ladoCaja / 2, inicioY + 3 + ladoCaja * 2]
+    }
+
+    Object.entries(posiciones).forEach(([clave, coordenadas]) => {
+      const [x, y] = coordenadas
+      const estado = superficies[clave] || 'ninguno'
+      const color = COLOR_SUPERFICIE_PDF[estado]
+
+      if (color) {
+        documento.setFillColor(...color)
+        documento.rect(x, y, ladoCaja, ladoCaja, 'F')
+      } else {
+        documento.setFillColor(255, 255, 255)
+        documento.rect(x, y, ladoCaja, ladoCaja, 'F')
+      }
+
+      documento.setDrawColor(...COLOR_DORADO_OSCURO)
+      documento.setLineWidth(0.2)
+      documento.rect(x, y, ladoCaja, ladoCaja, 'S')
+    })
+  })
+}
+
+function dibujarLeyendaOdontogramaPdf(documento, margen, y) {
+  const leyenda = [
+    ['Caries', COLOR_SUPERFICIE_PDF.caries],
+    ['Obturación de resina', COLOR_SUPERFICIE_PDF.resina],
+    ['Obturación de amalgama', COLOR_SUPERFICIE_PDF.amalgama],
+    ['Extracción indicada', COLOR_SUPERFICIE_PDF.extraccion]
+  ]
+
+  let cursorX = margen
+
+  documento.setFontSize(6.5)
+
+  leyenda.forEach(([etiqueta, color]) => {
+    documento.setFillColor(...color)
+    documento.rect(cursorX, y - 4, 5, 5, 'F')
+    documento.setDrawColor(...COLOR_DORADO_OSCURO)
+    documento.setLineWidth(0.2)
+    documento.rect(cursorX, y - 4, 5, 5, 'S')
+
+    documento.setTextColor(...COLOR_TEXTO)
+    documento.setFont('helvetica', 'normal')
+    documento.text(etiqueta, cursorX + 8, y)
+
+    cursorX += 8 + documento.getTextWidth(etiqueta) + 14
+  })
+}
+
+const ETIQUETA_PROTESIS = {
+  ninguna: 'Ninguna',
+  removible: 'Removible',
+  fija: 'Fija'
 }
 
 export async function generarPdfExpediente(datos) {
   const {
     paciente, empresaNombre, datosGenerales, antecedentes, consentimiento,
-    estadosDientes, diagnostico, notas, odontologoNombre, firmaPaciente, firmaOdontologo
+    estadosDientes, protesis, diagnostico, notas, odontologoNombre, firmaPaciente, firmaOdontologo
   } = datos
 
   const logoBase64 = await obtenerLogoBase64()
@@ -444,48 +519,32 @@ export async function generarPdfExpediente(datos) {
   documento.text(lineasConsentimiento, margen, cursorY)
   cursorY += lineasConsentimiento.length * 11 + 16
 
-  cursorY = saltoPaginaSiNecesario(cursorY, 140)
+  cursorY = saltoPaginaSiNecesario(cursorY, 160)
   if (cursorY === 30) dibujarEncabezado('EXPEDIENTE DENTAL')
 
   documento.setFont('helvetica', 'bold')
   documento.setFontSize(11)
   documento.text('ODONTOGRAMA', margen, cursorY)
-  cursorY += 8
+  cursorY += 4
 
-  const filaSuperior = DIENTES_SUPERIORES_PDF
-    .map((numero) => {
-      const codigo = abreviarDiente(estadosDientes?.[numero])
-      return codigo ? `${numero}:${codigo}` : null
-    })
-    .filter(Boolean)
+  const anchoDisponible = anchoPagina - margen * 2
 
-  const filaInferior = DIENTES_INFERIORES_PDF
-    .map((numero) => {
-      const codigo = abreviarDiente(estadosDientes?.[numero])
-      return codigo ? `${numero}:${codigo}` : null
-    })
-    .filter(Boolean)
+  cursorY += 16
+  dibujarFilaOdontogramaPdf(documento, margen, cursorY, anchoDisponible, DIENTES_SUPERIORES_PDF, estadosDientes)
+  cursorY += 20
 
-  documento.setFont('helvetica', 'normal')
+  cursorY += 20
+  dibujarFilaOdontogramaPdf(documento, margen, cursorY, anchoDisponible, DIENTES_INFERIORES_PDF, estadosDientes)
+  cursorY += 22
+
+  dibujarLeyendaOdontogramaPdf(documento, margen, cursorY)
+  cursorY += 16
+
+  documento.setFont('helvetica', 'bold')
   documento.setFontSize(8)
-
-  if (filaSuperior.length === 0 && filaInferior.length === 0) {
-    documento.text('Sin hallazgos registrados en el odontograma.', margen, cursorY + 10)
-    cursorY += 20
-  } else {
-    if (filaSuperior.length > 0) {
-      documento.text(`Superior: ${filaSuperior.join('  ')}`, margen, cursorY + 10, { maxWidth: anchoPagina - margen * 2 })
-      cursorY += 10 + Math.ceil(filaSuperior.join('  ').length / 100) * 10
-    }
-    if (filaInferior.length > 0) {
-      documento.text(`Inferior: ${filaInferior.join('  ')}`, margen, cursorY + 10, { maxWidth: anchoPagina - margen * 2 })
-      cursorY += 10 + Math.ceil(filaInferior.join('  ').length / 100) * 10
-    }
-  }
-
-  documento.setFontSize(6.5)
-  documento.text('Formato: número:código. a=arriba b=abajo i=izquierda d=derecha c=centro A=ausente', margen, cursorY + 8)
-  cursorY += 24
+  documento.setTextColor(...COLOR_TEXTO)
+  documento.text(`Prótesis: ${ETIQUETA_PROTESIS[protesis] || 'Ninguna'}`, margen, cursorY)
+  cursorY += 20
 
   cursorY = saltoPaginaSiNecesario(cursorY, 140)
   if (cursorY === 30) dibujarEncabezado('EXPEDIENTE DENTAL')

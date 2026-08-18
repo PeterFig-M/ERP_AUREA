@@ -48,17 +48,22 @@ export default function AtencionPacientes() {
 
   async function cargarDatos() {
     setCargando(true)
-    const [listaPacientes, listaDoctores, listaInventario, listaAtenciones] = await Promise.all([
-      obtenerColeccion('pacientes'),
-      obtenerColeccion('doctores'),
-      obtenerColeccion('inventario'),
-      obtenerColeccion('atenciones', 'creadoEn')
-    ])
-    setPacientes(listaPacientes)
-    setDoctores(listaDoctores)
-    setServicios(listaInventario.filter((producto) => producto.tipo === 'Servicio'))
-    setAtenciones(listaAtenciones)
-    setCargando(false)
+    try {
+      const [listaPacientes, listaDoctores, listaInventario, listaAtenciones] = await Promise.all([
+        obtenerColeccion('pacientes'),
+        obtenerColeccion('doctores'),
+        obtenerColeccion('inventario'),
+        obtenerColeccion('atenciones', 'creadoEn')
+      ])
+      setPacientes(listaPacientes)
+      setDoctores(listaDoctores)
+      setServicios(listaInventario.filter((producto) => producto.tipo === 'Servicio'))
+      setAtenciones(listaAtenciones)
+    } catch (error) {
+      setMensaje('Ocurrió un error al cargar los datos. Intenta recargar la página.')
+    } finally {
+      setCargando(false)
+    }
   }
 
   const serviciosFiltrados = busquedaServicio.length > 0

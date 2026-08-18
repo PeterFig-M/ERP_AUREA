@@ -51,6 +51,18 @@ export async function obtenerConfiguracionEmpresa() {
   return obtenerDocumentoPorId('configuracion', 'empresa')
 }
 
+function extraerNumeroCorrelativo(valor) {
+  if (valor === null || valor === undefined) return 0
+  const texto = String(valor).trim()
+  if (texto.length === 0) return 0
+
+  const segmentos = texto.split('-')
+  const ultimoSegmento = segmentos[segmentos.length - 1]
+  const numero = parseInt(ultimoSegmento, 10)
+
+  return isNaN(numero) ? 0 : numero
+}
+
 export async function generarSiguienteNumeroFactura() {
   const referenciaConfig = doc(db, 'configuracion', 'empresa')
 
@@ -58,8 +70,8 @@ export async function generarSiguienteNumeroFactura() {
     const snapshot = await transaccion.get(referenciaConfig)
     const datos = snapshot.data()
 
-    const correlativoActual = parseInt(datos.correlativo, 10)
-    const rangoFin = parseInt(datos.rangoFin, 10)
+    const correlativoActual = extraerNumeroCorrelativo(datos.correlativo)
+    const rangoFin = extraerNumeroCorrelativo(datos.rangoFin)
 
     if (correlativoActual > rangoFin) {
       throw new Error('El rango autorizado de facturación se ha agotado. Actualiza el CAI en Configuración.')
